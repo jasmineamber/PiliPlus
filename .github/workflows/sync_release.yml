@@ -1,0 +1,74 @@
+name: Sync & Auto Release
+
+on:
+  schedule:
+    - cron: '0 10 * * *'
+  workflow_dispatch:
+
+jobs:
+  check-and-sync:
+    runs-on: ubuntu-latest
+    outputs:
+      upstream_tag: ${{ steps.check.outputs.upstream_tag }}
+      need_build: ${{ steps.check.outputs.already_exists == 'false' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Sync upstream code
+        run: |
+          git remote add upstream https://github.com/bggRGjQaUbCoE/PiliPlus.git || true
+          git fetch upstream main
+          LOCAL=$(git rev-parse main)
+          REMOTE=$(git rev-parse upstream/main)
+          if [ "$LOCAL" != "$REMOTE" ]; then
+            git merge upstream/main --no-edit
+            git push origin main
+            echo "Code synced."
+          else
+            echo "Code already up to date."
+          fi
+
+      - name: Check upstream release
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          UPSTREAM_TAG=$(gh release list --repo bggRGjQaUbCoE/PiliPlus --limit 1 --json tagName --jq '.[0].tagName')
+          echo "upstream_tag=$UPSTREAM_TAG" >> $GITHUB_OUTPUT
+          if gh release view "$UPSTREAM_TAG" --repo jasmineamber/PiliPlus > /dev/null 2>&1; then
+            echo "already_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "already_exists=false" >> $GITHUB_OUTPUT
+          fi
+
+  release-and-build:
+    needs: check-and-sync
+    if: needs.check-and-sync.outputs.need_build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create release with upstream notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ needs.check-and-sync.outputs.upstream_tag }}"
+          gh release view "$TAG" --repo bggRGjQaUbCoE/PiliPlus --json body --jq '.body' > /tmp/release_body.md
+          gh release create "$TAG" \
+            --repo jasmineamber/PiliPlus \
+            --title "$TAG" \
+            --notes-file /tmp/release_body.md
+
+      - name: Trigger Windows build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run win_x64.yml --repo jasmineamber/PiliPlus -f tag=${{ needs.check-and-sync.outputs.upstream_tag }}
+
+      - name: Trigger iOS build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run ios.yml --repo jasmineamber/PiliPlus -f tag=${{ needs.check-and-sync.outputs.upstream_tag }}
