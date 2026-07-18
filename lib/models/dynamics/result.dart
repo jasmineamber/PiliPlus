@@ -61,6 +61,13 @@ class DynamicsDataModel {
           type != DynamicsTabType.up && tempBannedList?.isNotEmpty == true;
       for (final e in list) {
         DynamicItemModel item = DynamicItemModel.fromJson(e);
+        if (type == DynamicsTabType.video) {
+          final majorType = item.modules.moduleDynamic?.major?.type;
+          if (majorType != 'MAJOR_TYPE_ARCHIVE' &&
+              majorType != 'MAJOR_TYPE_UGC_SEASON') {
+            continue;
+          }
+        }
         if (antiGoodsDyn &&
             (item.orig?.modules.moduleDynamic?.additional?.type ==
                     'ADDITIONAL_TYPE_GOODS' ||

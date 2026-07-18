@@ -40,7 +40,7 @@ abstract final class DynamicsHttp {
     DynamicsTabType type = .all,
   }) async {
     Map<String, dynamic> data = {
-      if (type == .up) 'host_mid': hostMid else 'type': type.name,
+      if (type == .up) 'host_mid': hostMid else 'type': type == .video ? 'all' : type.name,
       'offset': ?offset,
       'features': Constants.dynFeatures,
     };
