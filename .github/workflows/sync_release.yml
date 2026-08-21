@@ -32,18 +32,22 @@ jobs:
           git fetch upstream main
           LOCAL=$(git rev-parse main)
           REMOTE=$(git rev-parse upstream/main)
-          if [ "$LOCAL" != "$REMOTE" ]; then
+          if git merge-base --is-ancestor upstream/main main; then
+            echo "Code already up to date."
+          else
             git merge upstream/main --no-edit --no-commit
             # Keep our own CI config: restore .github to the pre-merge state
             # and drop any workflow files added only by upstream.
             git checkout HEAD -- .github
             git diff --name-only --diff-filter=A --staged -- .github | while read -r f; do git rm --cached --ignore-unmatch "$f"; done
             git add -A
-            git commit --no-edit
-            git push origin main
-            echo "Code synced."
-          else
-            echo "Code already up to date."
+            if ! git diff --cached --quiet; then
+              git commit --no-edit
+              git push origin main
+              echo "Code synced."
+            else
+              echo "No code changes to sync (only .github differed)."
+            fi
           fi
 
       - name: Check upstream release
