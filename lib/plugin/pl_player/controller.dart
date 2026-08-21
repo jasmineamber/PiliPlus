@@ -1,5 +1,5 @@
 import 'dart:async' show StreamSubscription, Timer;
-import 'dart:convert' show ascii;
+import 'dart:convert' show ascii, utf8;
 import 'dart:io' show Platform;
 import 'dart:math' show max, min;
 import 'dart:ui' as ui;
@@ -52,12 +52,12 @@ import 'package:archive/archive.dart' show getCrc32;
 import 'package:canvas_danmaku/canvas_danmaku.dart';
 import 'package:easy_debounce/easy_throttle.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show HapticFeedback, DeviceOrientation;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import 'package:get/get.dart';
 import 'package:hive_ce/hive.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:native_device_orientation/native_device_orientation.dart';
@@ -816,8 +816,15 @@ class PlPlayerController with BlockConfigMixin {
       if (onlyPlayAudio.value) {
         video = audio;
       } else {
-        extras['audio-files'] =
-            '"${Platform.isWindows ? audio.replaceAll(';', r'\;') : audio.replaceAll(':', r'\:')}"';
+        // dely_open need provide length
+        video =
+            ('edl://'
+            '!no_clip;!no_chapters;'
+            // '!delay_open,media_type=video;'
+            '%${isFileSource ? utf8.encode(video).length : video.length}%$video;'
+            '!new_stream;!no_clip;!no_chapters;'
+            // '!delay_open,media_type=audio;'
+            '%${isFileSource ? utf8.encode(audio).length : audio.length}%$audio');
       }
       if (enableAudioNormalization) {
         final String audioNormalization;
@@ -1534,6 +1541,7 @@ class PlPlayerController with BlockConfigMixin {
 
   void onCloseAll() {
     _isCloseAll = true;
+    if (PlatformUtils.isDesktop) exitDesktopFullScreen();
     dispose();
     Get.until((route) => route.isFirst);
   }
@@ -1608,7 +1616,7 @@ class PlPlayerController with BlockConfigMixin {
   }
 
   void setContinuePlayInBackground() {
-    continuePlayInBackground.value = !continuePlayInBackground.value;
+    continuePlayInBackground.toggle();
     if (!tempPlayerConf) {
       setting.put(
         SettingBoxKey.continuePlayInBackground,
@@ -1618,10 +1626,8 @@ class PlPlayerController with BlockConfigMixin {
   }
 
   void setOnlyPlayAudio() {
-    onlyPlayAudio.value = !onlyPlayAudio.value;
-    videoPlayerController?.setVideoTrack(
-      onlyPlayAudio.value ? VideoTrack.no() : VideoTrack.auto(),
-    );
+    onlyPlayAudio.toggle();
+    videoPlayerController?.setVideoTrack(onlyPlayAudio.value ? .no() : .auto());
   }
 
   late final Map<String, ui.Image?> previewCache = {};
