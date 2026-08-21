@@ -5,6 +5,10 @@ on:
     - cron: '0 10 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: write
+  actions: write
+
 jobs:
   check-and-sync:
     runs-on: ubuntu-latest
@@ -19,7 +23,11 @@ jobs:
           fetch-depth: 0
 
       - name: Sync upstream code
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           git remote add upstream https://github.com/bggRGjQaUbCoE/PiliPlus.git || true
           git fetch upstream main
           LOCAL=$(git rev-parse main)
@@ -37,7 +45,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          UPSTREAM_TAG=$(gh release list --repo bggRGjQaUbCoE/PiliPlus --limit 1 --json tagName --jq '.[0].tagName')
+          UPSTREAM_TAG=$(gh release list --repo bggRGjQaUbCoE/PiliPlus --limit 1 --json tagName --jq '.[0].tagName' || true)
+          if [ -z "$UPSTREAM_TAG" ] || [ "$UPSTREAM_TAG" = "null" ]; then
+            echo "No upstream release found, skip."
+            echo "upstream_tag=" >> $GITHUB_OUTPUT
+            echo "already_exists=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
           echo "upstream_tag=$UPSTREAM_TAG" >> $GITHUB_OUTPUT
           if gh release view "$UPSTREAM_TAG" --repo jasmineamber/PiliPlus > /dev/null 2>&1; then
             echo "already_exists=true" >> $GITHUB_OUTPUT
@@ -55,6 +69,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ needs.check-and-sync.outputs.upstream_tag }}"
+          if [ -z "$TAG" ]; then
+            echo "No upstream tag, nothing to release."
+            exit 0
+          fi
           gh release view "$TAG" --repo bggRGjQaUbCoE/PiliPlus --json body --jq '.body' > /tmp/release_body.md
           gh release create "$TAG" \
             --repo jasmineamber/PiliPlus \
