@@ -730,7 +730,6 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       'volume':
           (PlatformUtils.isMobile ? Pref.playerVolume : volume.value * 100)
               .toString(),
-      'stream-lavf-o': 'reconnect=1,reconnect_max_retries=${Pref.retryCount}',
     };
     final autosync = Pref.autosync;
     if (autosync != '0') {
@@ -1006,7 +1005,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
           if (event.startsWith('tcp: ffurl_read returned ') ||
               event.startsWith("Failed to open https://") ||
               event.startsWith("Can not open external file https://")) {
-            Future.delayed(const Duration(milliseconds: 3000), refreshPlayer);
+            Timer(const Duration(milliseconds: 3000), refreshPlayer);
           }
           return;
         }
@@ -1019,7 +1018,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
             'controllerStream.error.listen',
             const Duration(milliseconds: 10000),
             () {
-              Future.delayed(const Duration(milliseconds: 3000), () {
+              Timer(const Duration(milliseconds: 3000), () {
                 // if (kDebugMode) {
                 //   debugPrint("isBuffering.value: ${isBuffering.value}");
                 // }
